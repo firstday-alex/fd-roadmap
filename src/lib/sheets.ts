@@ -9,11 +9,12 @@ export interface Initiative {
   priority: string;
   owner: string;
   notes: string;
+  bigSwing: string;
 }
 
 // Column order in the Google Sheet
-// Row 1 = headers: ID | Name | Pillar | Month | Status | Priority | Owner | Notes
-const COLUMNS = ['id', 'name', 'pillar', 'month', 'status', 'priority', 'owner', 'notes'] as const;
+// Row 1 = headers: ID | Name | Pillar | Month | Status | Priority | Owner | Notes | Big Swing
+const COLUMNS = ['id', 'name', 'pillar', 'month', 'status', 'priority', 'owner', 'notes', 'bigSwing'] as const;
 
 function getAuth() {
   const credentials = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
@@ -56,7 +57,7 @@ export async function getInitiatives(): Promise<Initiative[]> {
 
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId,
-    range: `${sheetName}!A2:H`, // Skip header row
+    range: `${sheetName}!A2:I`, // Skip header row
   });
 
   const rows = res.data.values || [];
@@ -69,6 +70,7 @@ export async function getInitiatives(): Promise<Initiative[]> {
     priority: row[5] || '',
     owner: row[6] || '',
     notes: row[7] || '',
+    bigSwing: row[8] || '',
   }));
 }
 
@@ -78,11 +80,11 @@ export async function addInitiative(initiative: Omit<Initiative, 'id'>): Promise
   const sheetName = getSheetName();
 
   const id = Date.now().toString();
-  const row = [id, initiative.name, initiative.pillar, initiative.month, initiative.status, initiative.priority, initiative.owner, initiative.notes];
+  const row = [id, initiative.name, initiative.pillar, initiative.month, initiative.status, initiative.priority, initiative.owner, initiative.notes, initiative.bigSwing];
 
   await sheets.spreadsheets.values.append({
     spreadsheetId,
-    range: `${sheetName}!A:H`,
+    range: `${sheetName}!A:I`,
     valueInputOption: 'RAW',
     requestBody: { values: [row] },
   });
@@ -98,7 +100,7 @@ export async function updateInitiative(id: string, updates: Partial<Initiative>)
   // Find the row with this ID
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId,
-    range: `${sheetName}!A:H`,
+    range: `${sheetName}!A:I`,
   });
 
   const rows = res.data.values || [];
@@ -115,14 +117,15 @@ export async function updateInitiative(id: string, updates: Partial<Initiative>)
     priority: currentRow[5] || '',
     owner: currentRow[6] || '',
     notes: currentRow[7] || '',
+    bigSwing: currentRow[8] || '',
   };
 
   const updated = { ...current, ...updates };
-  const newRow = [updated.id, updated.name, updated.pillar, updated.month, updated.status, updated.priority, updated.owner, updated.notes];
+  const newRow = [updated.id, updated.name, updated.pillar, updated.month, updated.status, updated.priority, updated.owner, updated.notes, updated.bigSwing];
 
   await sheets.spreadsheets.values.update({
     spreadsheetId,
-    range: `${sheetName}!A${rowIndex + 1}:H${rowIndex + 1}`,
+    range: `${sheetName}!A${rowIndex + 1}:I${rowIndex + 1}`,
     valueInputOption: 'RAW',
     requestBody: { values: [newRow] },
   });
@@ -138,7 +141,7 @@ export async function deleteInitiative(id: string): Promise<boolean> {
   // Get all data to find the row
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId,
-    range: `${sheetName}!A:H`,
+    range: `${sheetName}!A:I`,
   });
 
   const rows = res.data.values || [];
@@ -182,16 +185,16 @@ export async function ensureHeaders(): Promise<void> {
 
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId,
-    range: `${sheetName}!A1:H1`,
+    range: `${sheetName}!A1:I1`,
   });
 
   const headers = res.data.values?.[0];
-  const expected = ['ID', 'Name', 'Pillar', 'Month', 'Status', 'Priority', 'Owner', 'Notes'];
+  const expected = ['ID', 'Name', 'Pillar', 'Month', 'Status', 'Priority', 'Owner', 'Notes', 'Big Swing'];
 
   if (!headers || headers[0] !== 'ID') {
     await sheets.spreadsheets.values.update({
       spreadsheetId,
-      range: `${sheetName}!A1:H1`,
+      range: `${sheetName}!A1:I1`,
       valueInputOption: 'RAW',
       requestBody: { values: [expected] },
     });
@@ -368,6 +371,7 @@ export async function approveRequest(id: string): Promise<Initiative | null> {
     priority: request.priority,
     owner: '',
     notes: request.notes,
+    bigSwing: '',
   });
 
   // Delete from requests

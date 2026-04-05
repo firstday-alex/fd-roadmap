@@ -12,6 +12,7 @@ interface Initiative {
   priority: string;
   owner: string;
   notes: string;
+  bigSwing: string;
 }
 
 const PILLARS = ['CVR', 'AOV', 'LTV'];
@@ -26,8 +27,8 @@ function priorityClass(p: string) { return p === 'High' ? 'high' : p === 'Medium
 function nextIn(arr: string[], val: string) { const i = arr.indexOf(val); return arr[(i + 1) % arr.length]; }
 
 function exportCSV(items: Initiative[]) {
-  const headers = ['Name', 'Pillar', 'Month', 'Status', 'Priority', 'Owner', 'Notes'];
-  const rows = items.map(i => [i.name, i.pillar, i.month, i.status, i.priority, i.owner, i.notes].map(v => `"${(v || '').replace(/"/g, '""')}"`));
+  const headers = ['Name', 'Pillar', 'Month', 'Status', 'Priority', 'Owner', 'Notes', 'Big Swing'];
+  const rows = items.map(i => [i.name, i.pillar, i.month, i.status, i.priority, i.owner, i.notes, i.bigSwing === 'Yes' ? 'Yes' : 'No'].map(v => `"${(v || '').replace(/"/g, '""')}"`));
   const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
   const a = document.createElement('a'); a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv); a.download = 'firstday_q2_roadmap.csv'; a.click();
 }
@@ -45,7 +46,7 @@ async function api<T>(url: string, opts?: RequestInit): Promise<T> {
 // --- Components ---
 
 function AddModal({ onAdd, onClose, saving }: { onAdd: (item: Omit<Initiative, 'id'>) => void; onClose: () => void; saving: boolean }) {
-  const [form, setForm] = useState({ name: '', pillar: 'CVR', month: 'April', status: 'Planned', priority: 'High', owner: '', notes: '' });
+  const [form, setForm] = useState({ name: '', pillar: 'CVR', month: 'April', status: 'Planned', priority: 'High', owner: '', notes: '', bigSwing: '' });
   const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
   return (
     <div className="overlay" onClick={e => e.target === e.currentTarget && onClose()}>
@@ -88,6 +89,12 @@ function AddModal({ onAdd, onClose, saving }: { onAdd: (item: Omit<Initiative, '
           <input className="form-input" value={form.owner} onChange={e => set('owner', e.target.value)} placeholder="Name or team" />
         </div>
         <div className="form-group">
+          <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+            <input type="checkbox" checked={form.bigSwing === 'Yes'} onChange={e => set('bigSwing', e.target.checked ? 'Yes' : '')} style={{ width: 16, height: 16, accentColor: '#f59e0b' }} />
+            Big Swing
+          </label>
+        </div>
+        <div className="form-group">
           <label className="form-label">Notes / Hypothesis</label>
           <textarea className="form-textarea" value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="What's the expected impact?" />
         </div>
@@ -119,6 +126,7 @@ function Card({ item, onUpdate, onDelete }: { item: Initiative; onUpdate: (id: s
       <div className="card-meta">
         <span className={`pill pill-${statusClass(item.status)}`} onClick={() => onUpdate(item.id, 'status', nextIn(STATUSES, item.status))} title="Click to change status">{item.status}</span>
         <span className={`pill pill-${priorityClass(item.priority)}`} onClick={() => onUpdate(item.id, 'priority', nextIn(PRIORITIES, item.priority))} title="Click to change priority">{item.priority}</span>
+        <span className={`pill ${item.bigSwing === 'Yes' ? 'pill-bigswing' : 'pill-bigswing-off'}`} onClick={() => onUpdate(item.id, 'bigSwing', item.bigSwing === 'Yes' ? '' : 'Yes')} title="Toggle Big Swing">{item.bigSwing === 'Yes' ? 'Big Swing' : 'Swing?'}</span>
       </div>
       <div className="card-owner" onClick={() => setEditingOwner(true)}>
         {editingOwner
@@ -186,6 +194,7 @@ function ListView({ items, onUpdate, onDelete }: { items: Initiative[]; onUpdate
             <th>Month</th>
             <th>Status</th>
             <th>Priority</th>
+            <th>Big Swing</th>
             <th>Owner</th>
             <th>Notes</th>
             <th></th>
@@ -208,6 +217,9 @@ function ListView({ items, onUpdate, onDelete }: { items: Initiative[]; onUpdate
               </td>
               <td>
                 <span className={`pill pill-${priorityClass(item.priority)}`} style={{ cursor: 'pointer' }} onClick={() => onUpdate(item.id, 'priority', nextIn(PRIORITIES, item.priority))}>{item.priority}</span>
+              </td>
+              <td>
+                <span className={`pill ${item.bigSwing === 'Yes' ? 'pill-bigswing' : 'pill-bigswing-off'}`} style={{ cursor: 'pointer' }} onClick={() => onUpdate(item.id, 'bigSwing', item.bigSwing === 'Yes' ? '' : 'Yes')}>{item.bigSwing === 'Yes' ? 'Big Swing' : '—'}</span>
               </td>
               <td style={{ color: '#6b7280', minWidth: 100 }}>
                 <input defaultValue={item.owner} placeholder="—" onBlur={e => onUpdate(item.id, 'owner', e.target.value)} />
@@ -236,6 +248,7 @@ export default function RoadmapPage() {
   const [filterMonth, setFilterMonth] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [filterPriority, setFilterPriority] = useState('');
+  const [filterBigSwing, setFilterBigSwing] = useState('');
 
   // Debounce timer for updates
   const updateTimer = useRef<NodeJS.Timeout | null>(null);
@@ -308,6 +321,8 @@ export default function RoadmapPage() {
     if (filterMonth && i.month !== filterMonth) return false;
     if (filterStatus && i.status !== filterStatus) return false;
     if (filterPriority && i.priority !== filterPriority) return false;
+    if (filterBigSwing === 'Yes' && i.bigSwing !== 'Yes') return false;
+    if (filterBigSwing === 'No' && i.bigSwing === 'Yes') return false;
     if (search && !i.name.toLowerCase().includes(search.toLowerCase()) && !(i.notes || '').toLowerCase().includes(search.toLowerCase())) return false;
     return true;
   });
@@ -362,6 +377,8 @@ export default function RoadmapPage() {
         <div className="stat"><span className="stat-val" style={{ color: 'var(--inprog)' }}>{items.filter(i => i.status === 'In Progress').length}</span><span className="stat-label">In Progress</span></div>
         <div className="stat"><span className="stat-val" style={{ color: 'var(--done)' }}>{done}</span><span className="stat-label">Done</span></div>
         <div className="stat-divider" />
+        <div className="stat"><span className="stat-val" style={{ color: '#f59e0b' }}>{items.filter(i => i.bigSwing === 'Yes').length}</span><span className="stat-label">Big Swings</span></div>
+        <div className="stat-divider" />
         <div className="progress-wrap">
           <div className="progress-label">Completion · {pct}%</div>
           <div className="progress-bar-bg"><div className="progress-bar-fill" style={{ width: pct + '%' }} /></div>
@@ -385,6 +402,11 @@ export default function RoadmapPage() {
         <select className="filter-select" value={filterPriority} onChange={e => setFilterPriority(e.target.value)}>
           <option value="">All Priorities</option>
           {PRIORITIES.map(p => <option key={p}>{p}</option>)}
+        </select>
+        <select className="filter-select" value={filterBigSwing} onChange={e => setFilterBigSwing(e.target.value)}>
+          <option value="">All Initiatives</option>
+          <option value="Yes">Big Swings Only</option>
+          <option value="No">Non-Big Swings</option>
         </select>
         <div className="view-toggle">
           <button className={view === 'board' ? 'active' : ''} onClick={() => setView('board')}>Board</button>

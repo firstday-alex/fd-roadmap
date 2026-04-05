@@ -64,6 +64,8 @@ button { font-family: inherit; cursor: pointer; }
 .pill-planned { background: var(--planned-light); color: var(--planned); border: 1px solid #e5e7eb; }
 .pill-inprog { background: var(--inprog-light); color: var(--inprog); border: 1px solid #bfdbfe; }
 .pill-done { background: var(--done-light); color: var(--done); border: 1px solid var(--aov-border); }
+.pill-bigswing { background: #fffbeb; color: #d97706; border: 1px solid #fcd34d; font-weight: 700; }
+.pill-bigswing-off { background: transparent; color: #d1d5db; border: 1px solid #e5e7eb; font-weight: 500; }
 
 /* Board view */
 .board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; min-width: 800px; }

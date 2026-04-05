@@ -13,7 +13,7 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { name, pillar, month, status, priority, owner, notes } = body;
+    const { name, pillar, month, status, priority, owner, notes, bigSwing } = body;
 
     if (!name?.trim()) {
       return NextResponse.json({ error: 'Name is required' }, { status: 400 });
@@ -27,6 +27,7 @@ export async function POST(req: NextRequest) {
       priority: priority || 'High',
       owner: owner || '',
       notes: notes || '',
+      bigSwing: bigSwing || '',
     });
 
     return NextResponse.json(item, { status: 201 });
