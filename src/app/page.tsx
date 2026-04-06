@@ -152,29 +152,38 @@ function Card({ item, onUpdate, onDelete }: { item: Initiative; onUpdate: (id: s
 function BoardView({ items, onUpdate, onDelete }: { items: Initiative[]; onUpdate: (id: string, key: string, val: string) => void; onDelete: (id: string) => void }) {
   return (
     <div className="scroll-x">
-      <div className="board">
+      <div className="calendar-board">
+        {/* Month column headers */}
+        <div className="calendar-corner" />
+        {MONTHS.map(month => (
+          <div key={month} className="calendar-month-header">
+            <span>{month}</span>
+            <span className="count">{items.filter(i => i.month === month).length}</span>
+          </div>
+        ))}
+
+        {/* Pillar swimlane rows */}
         {PILLARS.map(pillar => {
-          const colItems = items.filter(i => i.pillar === pillar);
+          const rowItems = items.filter(i => i.pillar === pillar);
           return (
-            <div key={pillar} className="board-col">
-              <div className={`board-col-header ${pillarClass(pillar)}`}>
+            <>
+              <div key={pillar + '-label'} className={`calendar-pillar-label ${pillarClass(pillar)}`}>
                 <span style={{ fontWeight: 700 }}>{pillar}</span>
-                <span style={{ fontWeight: 400, opacity: 0.8 }}>— {PILLAR_DESC[pillar]}</span>
-                <span className="count">{colItems.length}</span>
+                <span style={{ fontWeight: 400, opacity: 0.8, fontSize: 11 }}>{PILLAR_DESC[pillar]}</span>
+                <span className="count">{rowItems.length}</span>
               </div>
               {MONTHS.map(month => {
-                const monthItems = colItems.filter(i => i.month === month);
+                const cellItems = rowItems.filter(i => i.month === month);
                 return (
-                  <div key={month} className="month-section">
-                    <div className="month-label">{month}</div>
-                    {monthItems.length === 0
-                      ? <div style={{ height: 40, border: '1px dashed #e5e7eb', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><span style={{ fontSize: 11, color: '#d1d5db' }}>No items</span></div>
-                      : monthItems.map(item => <Card key={item.id} item={item} onUpdate={onUpdate} onDelete={onDelete} />)
+                  <div key={pillar + '-' + month} className="calendar-cell">
+                    {cellItems.length === 0
+                      ? <div className="calendar-empty"><span>No items</span></div>
+                      : cellItems.map(item => <Card key={item.id} item={item} onUpdate={onUpdate} onDelete={onDelete} />)
                     }
                   </div>
                 );
               })}
-            </div>
+            </>
           );
         })}
       </div>
