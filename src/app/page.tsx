@@ -118,13 +118,24 @@ function AddModal({ onAdd, onClose, saving, defaultMonth }: { onAdd: (item: Omit
   );
 }
 
-function Card({ item, onUpdate, onDelete }: { item: Initiative; onUpdate: (id: string, key: string, val: string) => void; onDelete: (id: string) => void }) {
+function Card({ item, onUpdate, onDelete, draggable = false, onDragStart, onDragEnd, isDragging }: { item: Initiative; onUpdate: (id: string, key: string, val: string) => void; onDelete: (id: string) => void; draggable?: boolean; onDragStart?: (id: string) => void; onDragEnd?: () => void; isDragging?: boolean }) {
   const [editingName, setEditingName] = useState(false);
   const [editingOwner, setEditingOwner] = useState(false);
   const [editingNotes, setEditingNotes] = useState(false);
   const isDone = item.status === 'Done';
+  const isEditing = editingName || editingOwner || editingNotes;
   return (
-    <div className={`card ${isDone ? 'card-done' : ''}`}>
+    <div
+      className={`card ${isDone ? 'card-done' : ''} ${isDragging ? 'card-dragging' : ''} ${draggable && !isEditing ? 'card-draggable' : ''}`}
+      draggable={draggable && !isEditing}
+      onDragStart={e => {
+        if (!draggable || isEditing) { e.preventDefault(); return; }
+        e.dataTransfer.setData('text/plain', item.id);
+        e.dataTransfer.effectAllowed = 'move';
+        onDragStart?.(item.id);
+      }}
+      onDragEnd={() => onDragEnd?.()}
+    >
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
         <input
           type="checkbox"
@@ -176,6 +187,19 @@ function Card({ item, onUpdate, onDelete }: { item: Initiative; onUpdate: (id: s
 }
 
 function BoardView({ items, months, onUpdate, onDelete }: { items: Initiative[]; months: string[]; onUpdate: (id: string, key: string, val: string) => void; onDelete: (id: string) => void }) {
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dragOverKey, setDragOverKey] = useState<string | null>(null);
+
+  const handleDrop = (pillar: string, month: string) => {
+    if (!draggingId) return;
+    const dragged = items.find(i => i.id === draggingId);
+    setDragOverKey(null);
+    setDraggingId(null);
+    if (!dragged) return;
+    if (dragged.month !== month) onUpdate(draggingId, 'month', month);
+    if (dragged.pillar !== pillar) onUpdate(draggingId, 'pillar', pillar);
+  };
+
   return (
     <div className="scroll-x">
       <div className="calendar-board">
@@ -200,11 +224,41 @@ function BoardView({ items, months, onUpdate, onDelete }: { items: Initiative[];
               </div>
               {months.map(month => {
                 const cellItems = rowItems.filter(i => i.month === month);
+                const cellKey = pillar + '-' + month;
+                const isDragOver = dragOverKey === cellKey && draggingId !== null;
                 return (
-                  <div key={pillar + '-' + month} className="calendar-cell">
+                  <div
+                    key={cellKey}
+                    className={`calendar-cell ${isDragOver ? 'calendar-cell-dragover' : ''}`}
+                    onDragOver={e => {
+                      if (!draggingId) return;
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = 'move';
+                      if (dragOverKey !== cellKey) setDragOverKey(cellKey);
+                    }}
+                    onDragLeave={e => {
+                      if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+                      if (dragOverKey === cellKey) setDragOverKey(null);
+                    }}
+                    onDrop={e => {
+                      e.preventDefault();
+                      handleDrop(pillar, month);
+                    }}
+                  >
                     {cellItems.length === 0
-                      ? <div className="calendar-empty"><span>No items</span></div>
-                      : cellItems.map(item => <Card key={item.id} item={item} onUpdate={onUpdate} onDelete={onDelete} />)
+                      ? <div className="calendar-empty"><span>{isDragOver ? 'Drop here' : 'No items'}</span></div>
+                      : cellItems.map(item => (
+                          <Card
+                            key={item.id}
+                            item={item}
+                            onUpdate={onUpdate}
+                            onDelete={onDelete}
+                            draggable
+                            isDragging={draggingId === item.id}
+                            onDragStart={id => setDraggingId(id)}
+                            onDragEnd={() => { setDraggingId(null); setDragOverKey(null); }}
+                          />
+                        ))
                     }
                   </div>
                 );

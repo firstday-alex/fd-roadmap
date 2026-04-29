@@ -86,8 +86,11 @@ button { font-family: inherit; cursor: pointer; }
 .calendar-pillar-label.aov { border-left: 3px solid var(--aov); color: var(--aov); }
 .calendar-pillar-label.ltv { border-left: 3px solid var(--ltv); color: var(--ltv); }
 .calendar-pillar-label .count { font-size: 11px; font-weight: 500; opacity: 0.7; }
-.calendar-cell { background: #fff; padding: 10px; display: flex; flex-direction: column; gap: 8px; min-height: 80px; }
-.calendar-empty { flex: 1; display: flex; align-items: center; justify-content: center; border: 1px dashed #e5e7eb; border-radius: 8px; }
+.calendar-cell { background: #fff; padding: 10px; display: flex; flex-direction: column; gap: 8px; min-height: 80px; transition: background 0.12s, box-shadow 0.12s; }
+.calendar-cell.calendar-cell-dragover { background: #eef0fe; box-shadow: inset 0 0 0 2px var(--cvr); }
+.calendar-cell.calendar-cell-dragover .calendar-empty { border-color: var(--cvr); border-style: solid; background: #fff; }
+.calendar-cell.calendar-cell-dragover .calendar-empty span { color: var(--cvr); font-weight: 600; }
+.calendar-empty { flex: 1; display: flex; align-items: center; justify-content: center; border: 1px dashed #e5e7eb; border-radius: 8px; transition: border-color 0.12s, background 0.12s; }
 .calendar-empty span { font-size: 11px; color: #d1d5db; }
 
 .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px 14px; transition: box-shadow 0.15s, border-color 0.15s, background 0.15s; }
@@ -95,6 +98,9 @@ button { font-family: inherit; cursor: pointer; }
 .card.card-done { background: #ecfdf5; border-color: #a7f3d0; }
 .card.card-done .card-name { color: #065f46; text-decoration: line-through; text-decoration-color: rgba(6, 95, 70, 0.35); }
 .card.card-done:hover { box-shadow: 0 4px 12px rgba(16, 185, 129, 0.15); border-color: #6ee7b7; }
+.card.card-draggable { cursor: grab; }
+.card.card-draggable:active { cursor: grabbing; }
+.card.card-dragging { opacity: 0.4; }
 .card-check { width: 16px; height: 16px; margin-top: 2px; flex-shrink: 0; cursor: pointer; accent-color: #10b981; }
 .card-month-select { height: 22px; padding: 0 6px; border: 1px solid #e5e7eb; border-radius: 6px; font-size: 11px; font-weight: 500; color: #6b7280; background: #fff; outline: none; cursor: pointer; appearance: none; padding-right: 18px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' fill='%236b7280' viewBox='0 0 16 16'%3E%3Cpath d='M7.247 11.14L2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 5px center; }
 .card-month-select:hover { border-color: #d1d5db; color: #374151; }
