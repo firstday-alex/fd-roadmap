@@ -463,6 +463,7 @@ export default function RoadmapPage() {
         </div>
         <div className="header-right">
           <Link href="/config" className="btn btn-ghost btn-sm">⚙ Config</Link>
+          <Link href="/accomplishments" className="btn btn-ghost btn-sm">Accomplishments</Link>
           <Link href="/requests" className="btn btn-ghost btn-sm">Requests</Link>
           <button className="btn btn-ghost btn-sm" onClick={() => exportCSV(filtered)}>↓ Export CSV</button>
           <Link href="/request" className="btn btn-ghost btn-sm">Submit Request</Link>
