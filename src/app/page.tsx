@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import Link from 'next/link';
 
 interface Initiative {
@@ -16,21 +16,30 @@ interface Initiative {
 }
 
 const PILLARS = ['CVR', 'AOV', 'LTV'];
-const MONTHS = ['April', 'May', 'June'];
+const ALL_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const STATUSES = ['Planned', 'In Progress', 'Done'];
 const PRIORITIES = ['High', 'Medium', 'Low'];
 const PILLAR_DESC: Record<string, string> = { CVR: 'Conversion Rate', AOV: 'Avg Order Value', LTV: 'Subscriber Lifetime Value' };
+const WINDOW_SIZE = 3;
+const ROADMAP_YEAR = 2026;
 
 function pillarClass(p: string) { return p === 'CVR' ? 'cvr' : p === 'AOV' ? 'aov' : 'ltv'; }
 function statusClass(s: string) { return s === 'In Progress' ? 'inprog' : s === 'Done' ? 'done' : 'planned'; }
 function priorityClass(p: string) { return p === 'High' ? 'high' : p === 'Medium' ? 'med' : 'low'; }
 function nextIn(arr: string[], val: string) { const i = arr.indexOf(val); return arr[(i + 1) % arr.length]; }
+function currentMonthIdx() {
+  const now = new Date();
+  return now.getFullYear() === ROADMAP_YEAR ? now.getMonth() : 0;
+}
+function clampStart(idx: number) {
+  return Math.max(0, Math.min(ALL_MONTHS.length - WINDOW_SIZE, idx));
+}
 
 function exportCSV(items: Initiative[]) {
   const headers = ['Name', 'Pillar', 'Month', 'Status', 'Priority', 'Owner', 'Notes', 'Big Swing'];
   const rows = items.map(i => [i.name, i.pillar, i.month, i.status, i.priority, i.owner, i.notes, i.bigSwing === 'Yes' ? 'Yes' : 'No'].map(v => `"${(v || '').replace(/"/g, '""')}"`));
   const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
-  const a = document.createElement('a'); a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv); a.download = 'firstday_q2_roadmap.csv'; a.click();
+  const a = document.createElement('a'); a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv); a.download = 'firstday_roadmap.csv'; a.click();
 }
 
 // --- API helpers ---
@@ -45,8 +54,8 @@ async function api<T>(url: string, opts?: RequestInit): Promise<T> {
 
 // --- Components ---
 
-function AddModal({ onAdd, onClose, saving }: { onAdd: (item: Omit<Initiative, 'id'>) => void; onClose: () => void; saving: boolean }) {
-  const [form, setForm] = useState({ name: '', pillar: 'CVR', month: 'April', status: 'Planned', priority: 'High', owner: '', notes: '', bigSwing: '' });
+function AddModal({ onAdd, onClose, saving, defaultMonth }: { onAdd: (item: Omit<Initiative, 'id'>) => void; onClose: () => void; saving: boolean; defaultMonth: string }) {
+  const [form, setForm] = useState({ name: '', pillar: 'CVR', month: defaultMonth, status: 'Planned', priority: 'High', owner: '', notes: '', bigSwing: '' });
   const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
   return (
     <div className="overlay" onClick={e => e.target === e.currentTarget && onClose()}>
@@ -66,7 +75,7 @@ function AddModal({ onAdd, onClose, saving }: { onAdd: (item: Omit<Initiative, '
           <div className="form-group">
             <label className="form-label">Month</label>
             <select className="form-select" value={form.month} onChange={e => set('month', e.target.value)}>
-              {MONTHS.map(m => <option key={m}>{m}</option>)}
+              {ALL_MONTHS.map(m => <option key={m}>{m}</option>)}
             </select>
           </div>
         </div>
@@ -113,9 +122,17 @@ function Card({ item, onUpdate, onDelete }: { item: Initiative; onUpdate: (id: s
   const [editingName, setEditingName] = useState(false);
   const [editingOwner, setEditingOwner] = useState(false);
   const [editingNotes, setEditingNotes] = useState(false);
+  const isDone = item.status === 'Done';
   return (
-    <div className="card">
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 4 }}>
+    <div className={`card ${isDone ? 'card-done' : ''}`}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
+        <input
+          type="checkbox"
+          className="card-check"
+          checked={isDone}
+          onChange={e => onUpdate(item.id, 'status', e.target.checked ? 'Done' : 'Planned')}
+          title={isDone ? 'Mark as not deployed' : 'Mark as deployed / complete'}
+        />
         <div className="card-name" style={{ flex: 1 }} onClick={() => setEditingName(true)}>
           {editingName
             ? <input autoFocus defaultValue={item.name} onBlur={e => { onUpdate(item.id, 'name', e.target.value); setEditingName(false); }} onKeyDown={e => e.key === 'Enter' && (e.target as HTMLInputElement).blur()} />
@@ -127,6 +144,15 @@ function Card({ item, onUpdate, onDelete }: { item: Initiative; onUpdate: (id: s
         <span className={`pill pill-${statusClass(item.status)}`} onClick={() => onUpdate(item.id, 'status', nextIn(STATUSES, item.status))} title="Click to change status">{item.status}</span>
         <span className={`pill pill-${priorityClass(item.priority)}`} onClick={() => onUpdate(item.id, 'priority', nextIn(PRIORITIES, item.priority))} title="Click to change priority">{item.priority}</span>
         <span className={`pill ${item.bigSwing === 'Yes' ? 'pill-bigswing' : 'pill-bigswing-off'}`} onClick={() => onUpdate(item.id, 'bigSwing', item.bigSwing === 'Yes' ? '' : 'Yes')} title="Toggle Big Swing">{item.bigSwing === 'Yes' ? 'Big Swing' : 'Swing?'}</span>
+        <select
+          className="card-month-select"
+          value={item.month}
+          onChange={e => onUpdate(item.id, 'month', e.target.value)}
+          title="Move to month"
+          onClick={e => e.stopPropagation()}
+        >
+          {ALL_MONTHS.map(m => <option key={m}>{m}</option>)}
+        </select>
       </div>
       <div className="card-owner" onClick={() => setEditingOwner(true)}>
         {editingOwner
@@ -149,13 +175,13 @@ function Card({ item, onUpdate, onDelete }: { item: Initiative; onUpdate: (id: s
   );
 }
 
-function BoardView({ items, onUpdate, onDelete }: { items: Initiative[]; onUpdate: (id: string, key: string, val: string) => void; onDelete: (id: string) => void }) {
+function BoardView({ items, months, onUpdate, onDelete }: { items: Initiative[]; months: string[]; onUpdate: (id: string, key: string, val: string) => void; onDelete: (id: string) => void }) {
   return (
     <div className="scroll-x">
       <div className="calendar-board">
         {/* Month column headers */}
         <div className="calendar-corner" />
-        {MONTHS.map(month => (
+        {months.map(month => (
           <div key={month} className="calendar-month-header">
             <span>{month}</span>
             <span className="count">{items.filter(i => i.month === month).length}</span>
@@ -172,7 +198,7 @@ function BoardView({ items, onUpdate, onDelete }: { items: Initiative[]; onUpdat
                 <span style={{ fontWeight: 400, opacity: 0.8, fontSize: 11 }}>{PILLAR_DESC[pillar]}</span>
                 <span className="count">{rowItems.length}</span>
               </div>
-              {MONTHS.map(month => {
+              {months.map(month => {
                 const cellItems = rowItems.filter(i => i.month === month);
                 return (
                   <div key={pillar + '-' + month} className="calendar-cell">
@@ -198,6 +224,7 @@ function ListView({ items, onUpdate, onDelete }: { items: Initiative[]; onUpdate
       <table className="list-table">
         <thead>
           <tr>
+            <th></th>
             <th>Initiative</th>
             <th>Pillar</th>
             <th>Month</th>
@@ -210,35 +237,47 @@ function ListView({ items, onUpdate, onDelete }: { items: Initiative[]; onUpdate
           </tr>
         </thead>
         <tbody>
-          {items.map(item => (
-            <tr key={item.id}>
-              <td className="name">
-                <input defaultValue={item.name} onBlur={e => onUpdate(item.id, 'name', e.target.value)} />
-              </td>
-              <td><span className={`pill pill-${pillarClass(item.pillar)}`}>{item.pillar}</span></td>
-              <td>
-                <select className="filter-select" value={item.month} onChange={e => onUpdate(item.id, 'month', e.target.value)} style={{ height: 28, fontSize: 12 }}>
-                  {MONTHS.map(m => <option key={m}>{m}</option>)}
-                </select>
-              </td>
-              <td>
-                <span className={`pill pill-${statusClass(item.status)}`} style={{ cursor: 'pointer' }} onClick={() => onUpdate(item.id, 'status', nextIn(STATUSES, item.status))}>{item.status}</span>
-              </td>
-              <td>
-                <span className={`pill pill-${priorityClass(item.priority)}`} style={{ cursor: 'pointer' }} onClick={() => onUpdate(item.id, 'priority', nextIn(PRIORITIES, item.priority))}>{item.priority}</span>
-              </td>
-              <td>
-                <span className={`pill ${item.bigSwing === 'Yes' ? 'pill-bigswing' : 'pill-bigswing-off'}`} style={{ cursor: 'pointer' }} onClick={() => onUpdate(item.id, 'bigSwing', item.bigSwing === 'Yes' ? '' : 'Yes')}>{item.bigSwing === 'Yes' ? 'Big Swing' : '—'}</span>
-              </td>
-              <td style={{ color: '#6b7280', minWidth: 100 }}>
-                <input defaultValue={item.owner} placeholder="—" onBlur={e => onUpdate(item.id, 'owner', e.target.value)} />
-              </td>
-              <td style={{ color: '#6b7280', minWidth: 200 }}>
-                <input defaultValue={item.notes} placeholder="—" onBlur={e => onUpdate(item.id, 'notes', e.target.value)} />
-              </td>
-              <td><button className="delete-btn" onClick={() => onDelete(item.id)}>×</button></td>
-            </tr>
-          ))}
+          {items.map(item => {
+            const isDone = item.status === 'Done';
+            return (
+              <tr key={item.id} className={isDone ? 'row-done' : ''}>
+                <td style={{ width: 28 }}>
+                  <input
+                    type="checkbox"
+                    className="card-check"
+                    checked={isDone}
+                    onChange={e => onUpdate(item.id, 'status', e.target.checked ? 'Done' : 'Planned')}
+                    title={isDone ? 'Mark as not deployed' : 'Mark as deployed / complete'}
+                  />
+                </td>
+                <td className="name">
+                  <input defaultValue={item.name} onBlur={e => onUpdate(item.id, 'name', e.target.value)} />
+                </td>
+                <td><span className={`pill pill-${pillarClass(item.pillar)}`}>{item.pillar}</span></td>
+                <td>
+                  <select className="filter-select" value={item.month} onChange={e => onUpdate(item.id, 'month', e.target.value)} style={{ height: 28, fontSize: 12 }}>
+                    {ALL_MONTHS.map(m => <option key={m}>{m}</option>)}
+                  </select>
+                </td>
+                <td>
+                  <span className={`pill pill-${statusClass(item.status)}`} style={{ cursor: 'pointer' }} onClick={() => onUpdate(item.id, 'status', nextIn(STATUSES, item.status))}>{item.status}</span>
+                </td>
+                <td>
+                  <span className={`pill pill-${priorityClass(item.priority)}`} style={{ cursor: 'pointer' }} onClick={() => onUpdate(item.id, 'priority', nextIn(PRIORITIES, item.priority))}>{item.priority}</span>
+                </td>
+                <td>
+                  <span className={`pill ${item.bigSwing === 'Yes' ? 'pill-bigswing' : 'pill-bigswing-off'}`} style={{ cursor: 'pointer' }} onClick={() => onUpdate(item.id, 'bigSwing', item.bigSwing === 'Yes' ? '' : 'Yes')}>{item.bigSwing === 'Yes' ? 'Big Swing' : '—'}</span>
+                </td>
+                <td style={{ color: '#6b7280', minWidth: 100 }}>
+                  <input defaultValue={item.owner} placeholder="—" onBlur={e => onUpdate(item.id, 'owner', e.target.value)} />
+                </td>
+                <td style={{ color: '#6b7280', minWidth: 200 }}>
+                  <input defaultValue={item.notes} placeholder="—" onBlur={e => onUpdate(item.id, 'notes', e.target.value)} />
+                </td>
+                <td><button className="delete-btn" onClick={() => onDelete(item.id)}>×</button></td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
@@ -258,6 +297,12 @@ export default function RoadmapPage() {
   const [filterStatus, setFilterStatus] = useState('');
   const [filterPriority, setFilterPriority] = useState('');
   const [filterBigSwing, setFilterBigSwing] = useState('');
+  const [startMonthIdx, setStartMonthIdx] = useState<number>(() => clampStart(currentMonthIdx()));
+
+  const visibleMonths = useMemo(
+    () => ALL_MONTHS.slice(startMonthIdx, startMonthIdx + WINDOW_SIZE),
+    [startMonthIdx]
+  );
 
   // Debounce timer for updates
   const updateTimer = useRef<NodeJS.Timeout | null>(null);
@@ -336,8 +381,13 @@ export default function RoadmapPage() {
     return true;
   });
 
+  const visibleSet = new Set(visibleMonths);
+  const boardItems = view === 'board' ? filtered.filter(i => visibleSet.has(i.month)) : filtered;
+
   const done = items.filter(i => i.status === 'Done').length;
   const pct = items.length ? Math.round(done / items.length * 100) : 0;
+  const lastStart = ALL_MONTHS.length - WINDOW_SIZE;
+  const windowLabel = `${visibleMonths[0]} – ${visibleMonths[visibleMonths.length - 1]} ${ROADMAP_YEAR}`;
 
   if (loading) {
     return (
@@ -354,8 +404,8 @@ export default function RoadmapPage() {
 
       <div className="header">
         <div className="header-left">
-          <h1>firstday.com — Q2 2026 Roadmap</h1>
-          <p>April · May · June &nbsp;·&nbsp; CVR · AOV · LTV</p>
+          <h1>firstday.com — {ROADMAP_YEAR} Roadmap</h1>
+          <p>{windowLabel} &nbsp;·&nbsp; CVR · AOV · LTV</p>
         </div>
         <div className="header-right">
           <Link href="/config" className="btn btn-ghost btn-sm">⚙ Config</Link>
@@ -394,6 +444,40 @@ export default function RoadmapPage() {
         </div>
       </div>
 
+      <div className="month-window">
+        <div className="month-window-left">
+          <span className="month-window-label">View</span>
+          <button
+            className="month-nav-btn"
+            disabled={startMonthIdx === 0}
+            onClick={() => setStartMonthIdx(i => clampStart(i - 1))}
+            title="Previous month"
+          >‹</button>
+          <select
+            className="filter-select"
+            value={startMonthIdx}
+            onChange={e => setStartMonthIdx(clampStart(parseInt(e.target.value, 10)))}
+            style={{ minWidth: 130 }}
+          >
+            {ALL_MONTHS.slice(0, lastStart + 1).map((m, i) => (
+              <option key={m} value={i}>Start: {m}</option>
+            ))}
+          </select>
+          <button
+            className="month-nav-btn"
+            disabled={startMonthIdx >= lastStart}
+            onClick={() => setStartMonthIdx(i => clampStart(i + 1))}
+            title="Next month"
+          >›</button>
+          <span className="month-window-range">{windowLabel}</span>
+        </div>
+        <button
+          className="btn btn-ghost btn-sm"
+          onClick={() => setStartMonthIdx(clampStart(currentMonthIdx()))}
+          disabled={startMonthIdx === clampStart(currentMonthIdx())}
+        >Today</button>
+      </div>
+
       <div className="filters">
         <input className="filter-input" placeholder="Search initiatives…" value={search} onChange={e => setSearch(e.target.value)} />
         <select className="filter-select" value={filterPillar} onChange={e => setFilterPillar(e.target.value)}>
@@ -402,7 +486,7 @@ export default function RoadmapPage() {
         </select>
         <select className="filter-select" value={filterMonth} onChange={e => setFilterMonth(e.target.value)}>
           <option value="">All Months</option>
-          {MONTHS.map(m => <option key={m}>{m}</option>)}
+          {ALL_MONTHS.map(m => <option key={m}>{m}</option>)}
         </select>
         <select className="filter-select" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
           <option value="">All Statuses</option>
@@ -424,11 +508,11 @@ export default function RoadmapPage() {
       </div>
 
       {view === 'board'
-        ? <BoardView items={filtered} onUpdate={updateItem} onDelete={deleteItem} />
+        ? <BoardView items={boardItems} months={visibleMonths} onUpdate={updateItem} onDelete={deleteItem} />
         : <ListView items={filtered} onUpdate={updateItem} onDelete={deleteItem} />
       }
 
-      {showAdd && <AddModal onAdd={addItem} onClose={() => setShowAdd(false)} saving={saving} />}
+      {showAdd && <AddModal onAdd={addItem} onClose={() => setShowAdd(false)} saving={saving} defaultMonth={visibleMonths[0]} />}
     </div>
   );
 }
