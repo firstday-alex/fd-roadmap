@@ -18,6 +18,20 @@ const IMPACT_ORDER = ['XL', 'L', 'M', 'S', 'XS', '0'];
 const IMPACT_RANK: Record<string, number> = { XL: 5, L: 4, M: 3, S: 2, XS: 1, '0': 0 };
 const GROUP_OPTIONS = ['Theme', 'Impact Size', 'OKR', 'None'] as const;
 type Group = typeof GROUP_OPTIONS[number];
+const IMPACT_CHOICES = ['XL', 'L', 'M', 'S', 'XS', '0'];
+const OKR_CHOICES = ['CVR', 'AOV', 'LTV'];
+
+function todayMDY(): string {
+  const d = new Date();
+  return `${d.getMonth() + 1}/${d.getDate()}/${String(d.getFullYear()).slice(-2)}`;
+}
+
+function isoToMDY(iso: string): string {
+  if (!iso) return '';
+  const [y, m, d] = iso.split('-');
+  if (!y || !m || !d) return iso;
+  return `${parseInt(m, 10)}/${parseInt(d, 10)}/${y.slice(-2)}`;
+}
 
 function impactClass(s: string) {
   const v = (s || '').trim().toUpperCase();
@@ -75,6 +89,106 @@ function ImpactPill({ size }: { size: string }) {
   return <span className={`pill impact ${impactClass(size)}`}>{impactLabel(size)}</span>;
 }
 
+function AddAccomplishmentModal({
+  themes,
+  onAdd,
+  onClose,
+  saving,
+}: {
+  themes: string[];
+  onAdd: (item: Omit<Accomplishment, 'id'>) => void;
+  onClose: () => void;
+  saving: boolean;
+}) {
+  const [form, setForm] = useState({
+    Feature: '',
+    Theme: '',
+    OKR: 'CVR',
+    'Impact Size': 'M',
+    'Impact Notes': '',
+    'Completed Date': todayMDY(),
+  });
+  const [dateIso, setDateIso] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  });
+  const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
+  const handleSubmit = () => {
+    if (!form.Feature.trim()) return;
+    onAdd({ ...form, 'Completed Date': isoToMDY(dateIso) });
+  };
+  return (
+    <div className="overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal">
+        <h2>Add Accomplishment</h2>
+        <div className="form-group">
+          <label className="form-label">Feature *</label>
+          <input
+            className="form-input"
+            value={form.Feature}
+            onChange={e => set('Feature', e.target.value)}
+            placeholder="e.g. Test: Simplified LP"
+            autoFocus
+          />
+        </div>
+        <div className="form-row">
+          <div className="form-group">
+            <label className="form-label">Theme</label>
+            <input
+              className="form-input"
+              value={form.Theme}
+              onChange={e => set('Theme', e.target.value)}
+              placeholder="e.g. Simplification"
+              list="theme-suggestions"
+            />
+            <datalist id="theme-suggestions">
+              {themes.map(t => <option key={t} value={t} />)}
+            </datalist>
+          </div>
+          <div className="form-group">
+            <label className="form-label">OKR</label>
+            <select className="form-select" value={form.OKR} onChange={e => set('OKR', e.target.value)}>
+              {OKR_CHOICES.map(o => <option key={o} value={o}>{o}</option>)}
+            </select>
+          </div>
+        </div>
+        <div className="form-row">
+          <div className="form-group">
+            <label className="form-label">Impact Size</label>
+            <select className="form-select" value={form['Impact Size']} onChange={e => set('Impact Size', e.target.value)}>
+              {IMPACT_CHOICES.map(v => <option key={v} value={v}>{v === '0' ? '— (none)' : v}</option>)}
+            </select>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Completed Date</label>
+            <input
+              type="date"
+              className="form-input"
+              value={dateIso}
+              onChange={e => setDateIso(e.target.value)}
+            />
+          </div>
+        </div>
+        <div className="form-group">
+          <label className="form-label">Impact Notes</label>
+          <textarea
+            className="form-textarea"
+            value={form['Impact Notes']}
+            onChange={e => set('Impact Notes', e.target.value)}
+            placeholder="What shipped, results, or quick context"
+          />
+        </div>
+        <div className="modal-footer">
+          <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
+          <button className="btn btn-primary" disabled={saving || !form.Feature.trim()} onClick={handleSubmit}>
+            {saving ? 'Saving…' : 'Add Accomplishment'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AccomplishmentRow({ item }: { item: Accomplishment }) {
   const cls = impactClass(item['Impact Size']);
   return (
@@ -105,6 +219,9 @@ export default function AccomplishmentsPage() {
   const [filterImpact, setFilterImpact] = useState('');
   const [groupBy, setGroupBy] = useState<Group>('Theme');
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [showAdd, setShowAdd] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [addError, setAddError] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -120,6 +237,26 @@ export default function AccomplishmentsPage() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  const handleAdd = async (item: Omit<Accomplishment, 'id'>) => {
+    setSaving(true);
+    setAddError('');
+    try {
+      const res = await fetch('/api/accomplishments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(item),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to add');
+      setItems(prev => [{ ...item, id: data.id || `new-${Date.now()}` } as Accomplishment, ...prev]);
+      setShowAdd(false);
+    } catch (err: any) {
+      setAddError(err.message || String(err));
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const themes = useMemo(() => Array.from(new Set(items.map(i => i.Theme).filter(Boolean))).sort(), [items]);
   const okrs = useMemo(() => Array.from(new Set(items.map(i => i.OKR).filter(Boolean))).sort(), [items]);
@@ -182,6 +319,15 @@ export default function AccomplishmentsPage() {
         </div>
         <div className="header-right">
           <Link href="/" className="btn btn-ghost btn-sm">← Roadmap</Link>
+          <a
+            href="https://docs.google.com/spreadsheets/d/1KIeteYhzmalB8ykEnU_i3UtuQxj31nvIxaTvoE9tl9U/edit?gid=0#gid=0"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn btn-ghost btn-sm"
+          >
+            ✎ Edit in Sheets
+          </a>
+          <button className="btn btn-primary btn-sm" onClick={() => { setAddError(''); setShowAdd(true); }}>+ Add</button>
           <button className="btn btn-ghost btn-sm" onClick={load} disabled={loading}>↻ Refresh</button>
           <button className="btn btn-ghost btn-sm" onClick={() => exportCSV(filtered)}>↓ Export CSV</button>
         </div>
@@ -192,6 +338,22 @@ export default function AccomplishmentsPage() {
           <span>⚠</span> {error}
           <button onClick={load} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#dc2626', fontWeight: 600, cursor: 'pointer', fontSize: 12 }}>Retry</button>
         </div>
+      )}
+
+      {addError && (
+        <div className="error-banner">
+          <span>⚠</span> {addError}
+          <button onClick={() => setAddError('')} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#dc2626', fontWeight: 600, cursor: 'pointer', fontSize: 12 }}>Dismiss</button>
+        </div>
+      )}
+
+      {showAdd && (
+        <AddAccomplishmentModal
+          themes={themes}
+          saving={saving}
+          onClose={() => setShowAdd(false)}
+          onAdd={handleAdd}
+        />
       )}
 
       <div className="stats-bar">
