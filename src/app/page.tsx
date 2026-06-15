@@ -119,6 +119,7 @@ function AddModal({ onAdd, onClose, saving, defaultMonth }: { onAdd: (item: Omit
 }
 
 function Card({ item, onUpdate, onDelete, draggable = false, onDragStart, onDragEnd, isDragging }: { item: Initiative; onUpdate: (id: string, key: string, val: string) => void; onDelete: (id: string) => void; draggable?: boolean; onDragStart?: (id: string) => void; onDragEnd?: () => void; isDragging?: boolean }) {
+  const [expanded, setExpanded] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [editingOwner, setEditingOwner] = useState(false);
   const [editingNotes, setEditingNotes] = useState(false);
@@ -126,7 +127,7 @@ function Card({ item, onUpdate, onDelete, draggable = false, onDragStart, onDrag
   const isEditing = editingName || editingOwner || editingNotes;
   return (
     <div
-      className={`card ${isDone ? 'card-done' : ''} ${isDragging ? 'card-dragging' : ''} ${draggable && !isEditing ? 'card-draggable' : ''}`}
+      className={`card ${expanded ? '' : 'card-collapsed'} ${isDone ? 'card-done' : ''} ${isDragging ? 'card-dragging' : ''} ${draggable && !isEditing ? 'card-draggable' : ''}`}
       draggable={draggable && !isEditing}
       onDragStart={e => {
         if (!draggable || isEditing) { e.preventDefault(); return; }
@@ -144,13 +145,23 @@ function Card({ item, onUpdate, onDelete, draggable = false, onDragStart, onDrag
           onChange={e => onUpdate(item.id, 'status', e.target.checked ? 'Done' : 'Planned')}
           title={isDone ? 'Mark as not deployed' : 'Mark as deployed / complete'}
         />
-        <div className="card-name" style={{ flex: 1 }} onClick={() => setEditingName(true)}>
+        <button
+          className="card-toggle"
+          onClick={() => setExpanded(e => !e)}
+          title={expanded ? 'Collapse' : 'Expand'}
+        >{expanded ? '▾' : '▸'}</button>
+        <div
+          className="card-name"
+          style={{ flex: 1 }}
+          onClick={() => (expanded ? setEditingName(true) : setExpanded(true))}
+        >
           {editingName
             ? <input autoFocus defaultValue={item.name} onBlur={e => { onUpdate(item.id, 'name', e.target.value); setEditingName(false); }} onKeyDown={e => e.key === 'Enter' && (e.target as HTMLInputElement).blur()} />
             : item.name}
         </div>
         <button className="delete-btn" onClick={() => onDelete(item.id)} title="Delete">×</button>
       </div>
+      {expanded && (<>
       <div className="card-meta">
         <span className={`pill pill-${statusClass(item.status)}`} onClick={() => onUpdate(item.id, 'status', nextIn(STATUSES, item.status))} title="Click to change status">{item.status}</span>
         <span className={`pill pill-${priorityClass(item.priority)}`} onClick={() => onUpdate(item.id, 'priority', nextIn(PRIORITIES, item.priority))} title="Click to change priority">{item.priority}</span>
@@ -182,6 +193,7 @@ function Card({ item, onUpdate, onDelete, draggable = false, onDragStart, onDrag
           <button style={{ background: 'none', border: 'none', fontSize: 11, color: '#d1d5db', cursor: 'pointer', padding: 0 }} onClick={() => setEditingNotes(true)}>+ Add notes</button>
         </div>
       )}
+      </>)}
     </div>
   );
 }
@@ -344,6 +356,7 @@ export default function RoadmapPage() {
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [view, setView] = useState<'board' | 'list'>('board');
+  const [controlsCollapsed, setControlsCollapsed] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [search, setSearch] = useState('');
   const [filterPillar, setFilterPillar] = useState('');
@@ -478,6 +491,7 @@ export default function RoadmapPage() {
         </div>
       )}
 
+      {!controlsCollapsed && (
       <div className="stats-bar">
         <div className="stat"><span className="stat-val">{items.length}</span><span className="stat-label">Total</span></div>
         <div className="stat-divider" />
@@ -498,9 +512,15 @@ export default function RoadmapPage() {
           <div className="progress-bar-bg"><div className="progress-bar-fill" style={{ width: pct + '%' }} /></div>
         </div>
       </div>
+      )}
 
       <div className="month-window">
         <div className="month-window-left">
+          <button
+            className="month-collapse-btn"
+            onClick={() => setControlsCollapsed(c => !c)}
+            title={controlsCollapsed ? 'Show stats & filters' : 'Hide stats & filters'}
+          >{controlsCollapsed ? '▸' : '▾'}</button>
           <span className="month-window-label">View</span>
           <button
             className="month-nav-btn"
@@ -526,13 +546,20 @@ export default function RoadmapPage() {
           >›</button>
           <span className="month-window-range">{windowLabel}</span>
         </div>
-        <button
-          className="btn btn-ghost btn-sm"
-          onClick={() => setStartMonthIdx(clampStart(currentMonthIdx()))}
-          disabled={startMonthIdx === clampStart(currentMonthIdx())}
-        >Today</button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div className="view-toggle" style={{ marginLeft: 0 }}>
+            <button className={view === 'board' ? 'active' : ''} onClick={() => setView('board')}>Board</button>
+            <button className={view === 'list' ? 'active' : ''} onClick={() => setView('list')}>List</button>
+          </div>
+          <button
+            className="btn btn-ghost btn-sm"
+            onClick={() => setStartMonthIdx(clampStart(currentMonthIdx()))}
+            disabled={startMonthIdx === clampStart(currentMonthIdx())}
+          >Today</button>
+        </div>
       </div>
 
+      {!controlsCollapsed && (
       <div className="filters">
         <input className="filter-input" placeholder="Search initiatives…" value={search} onChange={e => setSearch(e.target.value)} />
         <select className="filter-select" value={filterPillar} onChange={e => setFilterPillar(e.target.value)}>
@@ -556,11 +583,8 @@ export default function RoadmapPage() {
           <option value="Yes">Big Swings Only</option>
           <option value="No">Non-Big Swings</option>
         </select>
-        <div className="view-toggle">
-          <button className={view === 'board' ? 'active' : ''} onClick={() => setView('board')}>Board</button>
-          <button className={view === 'list' ? 'active' : ''} onClick={() => setView('list')}>List</button>
-        </div>
       </div>
+      )}
 
       {view === 'board'
         ? <BoardView items={boardItems} months={visibleMonths} onUpdate={updateItem} onDelete={deleteItem} />

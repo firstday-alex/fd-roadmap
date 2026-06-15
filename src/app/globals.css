@@ -51,6 +51,8 @@ button { font-family: inherit; cursor: pointer; }
 .month-nav-btn { width: 30px; height: 30px; border: 1px solid #e5e7eb; background: #fff; border-radius: 8px; color: #374151; font-size: 16px; line-height: 1; display: inline-flex; align-items: center; justify-content: center; transition: all 0.15s; }
 .month-nav-btn:hover:not(:disabled) { background: #f9fafb; border-color: #d1d5db; }
 .month-nav-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.month-collapse-btn { width: 30px; height: 30px; border: 1px solid #e5e7eb; background: #fff; border-radius: 8px; color: #6b7280; font-size: 12px; line-height: 1; display: inline-flex; align-items: center; justify-content: center; transition: all 0.15s; }
+.month-collapse-btn:hover { background: #f9fafb; border-color: #d1d5db; color: #0f1117; }
 
 /* Filters */
 .filters { display: flex; align-items: center; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
@@ -102,6 +104,10 @@ button { font-family: inherit; cursor: pointer; }
 .card.card-draggable:active { cursor: grabbing; }
 .card.card-dragging { opacity: 0.4; }
 .card-check { width: 16px; height: 16px; margin-top: 2px; flex-shrink: 0; cursor: pointer; accent-color: #10b981; }
+.card-toggle { background: none; border: none; padding: 0; margin-top: 1px; flex-shrink: 0; font-size: 10px; line-height: 1; color: #9ca3af; width: 12px; }
+.card-toggle:hover { color: #4f6ef7; }
+.card.card-collapsed { padding: 8px 12px; }
+.card.card-collapsed .card-name { margin-bottom: 0; }
 .card-month-select { height: 22px; padding: 0 6px; border: 1px solid #e5e7eb; border-radius: 6px; font-size: 11px; font-weight: 500; color: #6b7280; background: #fff; outline: none; cursor: pointer; appearance: none; padding-right: 18px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' fill='%236b7280' viewBox='0 0 16 16'%3E%3Cpath d='M7.247 11.14L2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 5px center; }
 .card-month-select:hover { border-color: #d1d5db; color: #374151; }
 .card-month-select:focus { border-color: #4f6ef7; box-shadow: 0 0 0 2px rgba(79,110,247,0.08); }
