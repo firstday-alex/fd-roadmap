@@ -235,7 +235,9 @@ function BoardView({ items, months, onUpdate, onDelete }: { items: Initiative[];
                 <span className="count">{rowItems.length}</span>
               </div>
               {months.map(month => {
-                const cellItems = rowItems.filter(i => i.month === month);
+                const cellItems = rowItems
+                  .filter(i => i.month === month)
+                  .sort((a, b) => Number(a.status === 'Done') - Number(b.status === 'Done'));
                 const cellKey = pillar + '-' + month;
                 const isDragOver = dragOverKey === cellKey && draggingId !== null;
                 return (
@@ -285,6 +287,7 @@ function BoardView({ items, months, onUpdate, onDelete }: { items: Initiative[];
 
 function ListView({ items, onUpdate, onDelete }: { items: Initiative[]; onUpdate: (id: string, key: string, val: string) => void; onDelete: (id: string) => void }) {
   if (!items.length) return <div className="empty-state">No initiatives match your filters.</div>;
+  const sorted = [...items].sort((a, b) => Number(a.status === 'Done') - Number(b.status === 'Done'));
   return (
     <div className="scroll-x">
       <table className="list-table">
@@ -303,7 +306,7 @@ function ListView({ items, onUpdate, onDelete }: { items: Initiative[]; onUpdate
           </tr>
         </thead>
         <tbody>
-          {items.map(item => {
+          {sorted.map(item => {
             const isDone = item.status === 'Done';
             return (
               <tr key={item.id} className={isDone ? 'row-done' : ''}>
