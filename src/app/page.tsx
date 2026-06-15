@@ -20,7 +20,7 @@ const ALL_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'Jul
 const STATUSES = ['Planned', 'In Progress', 'Done'];
 const PRIORITIES = ['High', 'Medium', 'Low'];
 const PILLAR_DESC: Record<string, string> = { CVR: 'Conversion Rate', AOV: 'Avg Order Value', LTV: 'Subscriber Lifetime Value' };
-const WINDOW_SIZE = 3;
+const WINDOW_SIZES = [3, 6];
 const ROADMAP_YEAR = 2026;
 
 function pillarClass(p: string) { return p === 'CVR' ? 'cvr' : p === 'AOV' ? 'aov' : 'ltv'; }
@@ -31,8 +31,8 @@ function currentMonthIdx() {
   const now = new Date();
   return now.getFullYear() === ROADMAP_YEAR ? now.getMonth() : 0;
 }
-function clampStart(idx: number) {
-  return Math.max(0, Math.min(ALL_MONTHS.length - WINDOW_SIZE, idx));
+function clampStart(idx: number, size: number) {
+  return Math.max(0, Math.min(ALL_MONTHS.length - size, idx));
 }
 
 function exportCSV(items: Initiative[]) {
@@ -214,7 +214,13 @@ function BoardView({ items, months, onUpdate, onDelete }: { items: Initiative[];
 
   return (
     <div className="scroll-x">
-      <div className="calendar-board">
+      <div
+        className="calendar-board"
+        style={{
+          gridTemplateColumns: `140px repeat(${months.length}, minmax(200px, 1fr))`,
+          minWidth: 140 + months.length * 220,
+        }}
+      >
         {/* Month column headers */}
         <div className="calendar-corner" />
         {months.map(month => (
@@ -367,12 +373,18 @@ export default function RoadmapPage() {
   const [filterStatus, setFilterStatus] = useState('');
   const [filterPriority, setFilterPriority] = useState('');
   const [filterBigSwing, setFilterBigSwing] = useState('');
-  const [startMonthIdx, setStartMonthIdx] = useState<number>(() => clampStart(currentMonthIdx()));
+  const [windowSize, setWindowSize] = useState(3);
+  const [startMonthIdx, setStartMonthIdx] = useState<number>(() => clampStart(currentMonthIdx(), 3));
 
   const visibleMonths = useMemo(
-    () => ALL_MONTHS.slice(startMonthIdx, startMonthIdx + WINDOW_SIZE),
-    [startMonthIdx]
+    () => ALL_MONTHS.slice(startMonthIdx, startMonthIdx + windowSize),
+    [startMonthIdx, windowSize]
   );
+
+  const changeWindowSize = useCallback((size: number) => {
+    setWindowSize(size);
+    setStartMonthIdx(i => clampStart(i, size));
+  }, []);
 
   // Debounce timer for updates
   const updateTimer = useRef<NodeJS.Timeout | null>(null);
@@ -456,7 +468,7 @@ export default function RoadmapPage() {
 
   const done = items.filter(i => i.status === 'Done').length;
   const pct = items.length ? Math.round(done / items.length * 100) : 0;
-  const lastStart = ALL_MONTHS.length - WINDOW_SIZE;
+  const lastStart = ALL_MONTHS.length - windowSize;
   const windowLabel = `${visibleMonths[0]} – ${visibleMonths[visibleMonths.length - 1]} ${ROADMAP_YEAR}`;
 
   if (loading) {
@@ -530,13 +542,13 @@ export default function RoadmapPage() {
           <button
             className="month-nav-btn"
             disabled={startMonthIdx === 0}
-            onClick={() => setStartMonthIdx(i => clampStart(i - 1))}
+            onClick={() => setStartMonthIdx(i => clampStart(i - 1, windowSize))}
             title="Previous month"
           >‹</button>
           <select
             className="filter-select"
             value={startMonthIdx}
-            onChange={e => setStartMonthIdx(clampStart(parseInt(e.target.value, 10)))}
+            onChange={e => setStartMonthIdx(clampStart(parseInt(e.target.value, 10), windowSize))}
             style={{ minWidth: 130 }}
           >
             {ALL_MONTHS.slice(0, lastStart + 1).map((m, i) => (
@@ -546,20 +558,25 @@ export default function RoadmapPage() {
           <button
             className="month-nav-btn"
             disabled={startMonthIdx >= lastStart}
-            onClick={() => setStartMonthIdx(i => clampStart(i + 1))}
+            onClick={() => setStartMonthIdx(i => clampStart(i + 1, windowSize))}
             title="Next month"
           >›</button>
           <span className="month-window-range">{windowLabel}</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <div className="view-toggle" style={{ marginLeft: 0 }}>
+            {WINDOW_SIZES.map(s => (
+              <button key={s} className={windowSize === s ? 'active' : ''} onClick={() => changeWindowSize(s)} title={`Show ${s} months at once`}>{s}M</button>
+            ))}
+          </div>
+          <div className="view-toggle" style={{ marginLeft: 0 }}>
             <button className={view === 'board' ? 'active' : ''} onClick={() => setView('board')}>Board</button>
             <button className={view === 'list' ? 'active' : ''} onClick={() => setView('list')}>List</button>
           </div>
           <button
             className="btn btn-ghost btn-sm"
-            onClick={() => setStartMonthIdx(clampStart(currentMonthIdx()))}
-            disabled={startMonthIdx === clampStart(currentMonthIdx())}
+            onClick={() => setStartMonthIdx(clampStart(currentMonthIdx(), windowSize))}
+            disabled={startMonthIdx === clampStart(currentMonthIdx(), windowSize)}
           >Today</button>
         </div>
       </div>
