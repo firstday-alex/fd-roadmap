@@ -469,6 +469,7 @@ export default function RoadmapPage() {
     <div className="app">
       {saving && <div className="saving-indicator">Saving…</div>}
 
+      {!controlsCollapsed && (
       <div className="header">
         <div className="header-left">
           <h1>firstday.com — {ROADMAP_YEAR} Roadmap</h1>
@@ -483,6 +484,7 @@ export default function RoadmapPage() {
           <button className="btn btn-primary btn-sm" onClick={() => setShowAdd(true)}>+ Add Initiative</button>
         </div>
       </div>
+      )}
 
       {error && (
         <div className="error-banner">
